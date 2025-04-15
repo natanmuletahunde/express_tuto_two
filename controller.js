@@ -4,3 +4,4 @@ export const userLogin = (req,res)=>{
 export const userSign = (req,res)=>{
     res.send('this is the user Signup route')
 }
+
