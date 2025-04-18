@@ -1,18 +1,11 @@
 import express from 'express'
+import bcrypt, { compare }  from 'bcryptjs'
 import { connectDB } from './config/db.js'
-import session from 'express-session'
-
+import jwt from 'jsonwebtoken'
 const app = express()
 const PORT = 3000
 
 app.use(express.json())
-
-// ✅ Move this before any routes that use sessions
-app.use(session({
-  secret: 'sample-secret',
-  resave: false,
-  saveUninitialized: false
-}))
 
 await connectDB()
 
@@ -25,7 +18,8 @@ app.get('/', (req, res) => {
 // ✅ Register route
 app.post('/register', async (req, res) => {
   const { username, password } = req.body
-  users.push({ username, password })
+  const hashedPassword = await bcrypt.hash(password,10)
+ users.push({ username, password:hashedPassword })
   res.send('User Registered')
 })
 
@@ -33,21 +27,29 @@ app.post('/register', async (req, res) => {
 app.post('/login', async (req, res) => {
   const { username, password } = req.body
   const user = users.find(u => u.username === username)
-
-  if (!user || user.password !== password) {
+  if (!user || !(await bcrypt.compare(password,user.password))) {
     return res.send('Not Authorized')
   }
-
-  req.session.user = user
-  res.send('User Logged in')
+   const token = jwt.sign({username}, 'test#secret') // used to generate the token and sign it by test#secret
+   res.json({token})
 })
 
 // ✅ Protected dashboard
 app.get('/dashboard', (req, res) => {
-  if (!req.session.user) {
-    return res.send('Unauthorized')
-  }
-  res.send(`Welcome, ${req.session.user.username}`)
+   try {
+    const token = req.header('Authorization')
+    const decodedToken = jwt.verify(token,'test#secret') 
+    if(decodedToken.username){
+        res.send(`Welcome ,${decodedToken.username}`)
+    } 
+    else{
+     res.send('Access Denied')
+    }
+   } catch (error) {
+    res.send('Access Denied')
+
+   }
+
 })
 
 // ✅ Page visit counter
@@ -70,3 +72,4 @@ app.get('/remove-visit', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`)
 })
+  
